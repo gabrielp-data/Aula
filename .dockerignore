@@ -1,0 +1,10 @@
+.git
+.venv
+.dvc/cache
+__pycache__
+*.pyc
+mlruns/
+artifacts/
+data/*.csv
+.env
+*.pkl

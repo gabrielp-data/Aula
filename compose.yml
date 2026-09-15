@@ -1,0 +1,16 @@
+services:
+  treino:
+    build: .
+    volumes:
+      - ./src:/app/src         # edita local, roda no container
+      - ./data:/app/data       # dado via bind mount (sem rebuild)
+      - ./artifacts:/app/artifacts
+    command: uv run python -m churn.model
+
+  grid:
+    build: .
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./mlruns:/app/mlruns
+    command: uv run python -m churn.experiments

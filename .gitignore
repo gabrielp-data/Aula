@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+artifacts/
+.env
+mlruns/
+# dados: versionados pelo DVC
+/data/*.csv
+.pytest_cache/
+*.egg-info/
+dist/
