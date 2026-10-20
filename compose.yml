@@ -14,3 +14,12 @@ services:
       - ./data:/app/data
       - ./mlruns:/app/mlruns
     command: uv run python -m churn.experiments
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./artifacts:/app/artifacts
+    command: uv run uvicorn churn.app:app --host 0.0.0.0 --port 8000

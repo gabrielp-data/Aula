@@ -19,8 +19,9 @@ prj_churn/
 │  ├─ experiments.py   # grid rastreado (MLflow)
 │  ├─ lineage.py       # data_md5() e git_commit()
 │  ├─ registry.py      # Model Registry — register, aliases @champion/@challenger
-│  └─ predict.py       # inferência em lote via @champion (pyfunc)
-├─ tests/              # pytest (data, features, schema)
+│  ├─ predict.py       # inferência em lote via @champion (pyfunc)
+│  └─ app.py           # API REST FastAPI (GET /health, POST /predict)
+├─ tests/              # pytest (data, features, schema, app)
 ├─ data/
 │  ├─ churn.csv.dvc    # ponteiro DVC (o .csv fica no remote)
 │  └─ .gitignore
@@ -166,6 +167,52 @@ uv run python -m churn.predict --input data/churn.csv --output predictions.csv
 | `print(accuracy)` e esquece | MLflow registra params, métricas e artefatos |
 | modelo em arquivo pkl sem rastreamento | Model Registry com aliases `@champion`/`@challenger` |
 | inferência acoplada ao código de treino | `predict.py` carrega `@champion` via pyfunc (agnóstico) |
+
+## Bloco 3 — Serving (Encontro 12)
+
+### FastAPI
+
+```bash
+# 1. treine o modelo primeiro (gera artifacts/churn_model.pkl)
+uv run python -m churn.model
+
+# 2. suba a API
+uv run uvicorn churn.app:app --reload --port 8000
+```
+
+- **Docs interativas:** http://localhost:8000/docs
+- **Health check:** http://localhost:8000/health
+
+Exemplo de chamada:
+
+```bash
+curl -s -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gender": "Male", "SeniorCitizen": 0, "Partner": "Yes",
+    "Dependents": "No", "tenure": 12, "PhoneService": "Yes",
+    "MultipleLines": "No", "InternetService": "DSL",
+    "OnlineSecurity": "No", "OnlineBackup": "No",
+    "DeviceProtection": "No", "TechSupport": "No",
+    "StreamingTV": "No", "StreamingMovies": "No",
+    "Contract": "Month-to-month", "PaperlessBilling": "Yes",
+    "PaymentMethod": "Electronic check",
+    "MonthlyCharges": 55.5, "TotalCharges": 666.0
+  }'
+```
+
+Resposta:
+```json
+{"churn": true, "churn_probability": 0.72, "label": "Yes"}
+```
+
+Ou com Docker Compose:
+
+```bash
+docker compose up api
+```
+
+---
 
 ## Próximos encontros
 
