@@ -9,6 +9,7 @@ from pathlib import Path
 
 import mlflow
 import mlflow.sklearn
+from mlflow.models import infer_signature
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
@@ -62,11 +63,21 @@ def train(cfg: Settings = settings) -> tuple[RandomForestClassifier, dict[str, f
         })
         mlflow.log_params(cfg.model_dump())
 
-        model = build_model(cfg).fit(encoder.transform(x_train), y_train)
-        metrics = evaluate(model, encoder.transform(x_test), y_test)
+        x_train_enc = encoder.transform(x_train)
+        x_test_enc = encoder.transform(x_test)
+
+        model = build_model(cfg).fit(x_train_enc, y_train)
+        metrics = evaluate(model, x_test_enc, y_test)
+
+        signature = infer_signature(x_train_enc, model.predict(x_train_enc))
 
         mlflow.log_metrics(metrics)
-        mlflow.sklearn.log_model(model, artifact_path="model")
+        mlflow.sklearn.log_model(
+            model,
+            artifact_path="model",
+            signature=signature,
+            input_example=x_train_enc.iloc[:5],
+        )
 
     save_artifact(model, encoder, cfg.artifact_path)
     return model, metrics

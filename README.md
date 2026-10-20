@@ -14,10 +14,12 @@ prj_churn/
 │  ├─ data.py          # carga, limpeza, validação (pandera)
 │  ├─ schema.py        # ChurnSchema — contrato de dados
 │  ├─ features.py      # transformações puras + encoder sem vazamento
-│  ├─ model.py         # treino + MLflow tracking
+│  ├─ model.py         # treino + MLflow tracking + signature
 │  ├─ evaluate.py      # métricas
 │  ├─ experiments.py   # grid rastreado (MLflow)
-│  └─ lineage.py       # data_md5() e git_commit()
+│  ├─ lineage.py       # data_md5() e git_commit()
+│  ├─ registry.py      # Model Registry — register, aliases @champion/@challenger
+│  └─ predict.py       # inferência em lote via @champion (pyfunc)
 ├─ tests/              # pytest (data, features, schema)
 ├─ data/
 │  ├─ churn.csv.dvc    # ponteiro DVC (o .csv fica no remote)
@@ -81,9 +83,9 @@ dvc push           # sobe a nova versão do dado
 
 ---
 
-## Bloco 2 — ML Pipeline (Encontro 6)
+## Bloco 2 — ML Pipeline (Encontros 6–8)
 
-### MLflow Tracking
+### Encontro 6 — MLflow Tracking
 
 ```bash
 uv run python -m churn.model          # um run rastreado
@@ -97,6 +99,54 @@ Achar o melhor run por código:
 import mlflow
 runs = mlflow.search_runs(experiment_names=["churn"], order_by=["metrics.roc_auc DESC"])
 print(runs.iloc[0][["params.n_estimators", "params.max_depth", "metrics.roc_auc"]])
+```
+
+> **Dica:** use `--backend-store-uri sqlite:///mlflow.db` para um backend persistente:
+> ```bash
+> MLFLOW_TRACKING_URI=sqlite:///mlflow.db uv run python -m churn.model
+> MLFLOW_TRACKING_URI=sqlite:///mlflow.db uv run mlflow ui
+> ```
+
+### Encontro 7 — Model Registry
+
+Registra a melhor run e promove o alias `@champion`:
+
+```bash
+uv run python -m churn.registry
+```
+
+Saída esperada:
+```
+Melhor run: abc12345  roc_auc=0.8195
+Modelo registrado → versão 1
+Alias @champion → v1
+
+Versões registradas:
+  v1  run=abc12345  status=READY  aliases=['champion']
+```
+
+Carregar o campeão em código:
+
+```python
+from churn.registry import load_champion
+model = load_champion()            # pyfunc — agnóstico de framework
+preds = model.predict(features_df)
+```
+
+### Encontro 8 — Empacotamento (MLflow Models)
+
+O `model.py` agora registra **assinatura** e **exemplo de entrada** junto ao artefato:
+
+```python
+signature = infer_signature(x_train_enc, model.predict(x_train_enc))
+mlflow.sklearn.log_model(model, artifact_path="model",
+                         signature=signature, input_example=x_train_enc.iloc[:5])
+```
+
+Inferência em lote com o `@champion`:
+
+```bash
+uv run python -m churn.predict --input data/churn.csv --output predictions.csv
 ```
 
 ---
@@ -114,11 +164,11 @@ print(runs.iloc[0][["params.n_estimators", "params.max_depth", "metrics.roc_auc"
 | sem validação de dados | `ChurnSchema` (pandera) — falha cedo e com mensagem |
 | dataset solto no disco | `churn.csv.dvc` — versionado pelo DVC |
 | `print(accuracy)` e esquece | MLflow registra params, métricas e artefatos |
+| modelo em arquivo pkl sem rastreamento | Model Registry com aliases `@champion`/`@challenger` |
+| inferência acoplada ao código de treino | `predict.py` carrega `@champion` via pyfunc (agnóstico) |
 
 ## Próximos encontros
 
-- **Enc. 7** — Model Registry (MLflow).
-- **Enc. 8** — Empacotamento com MLflow Models.
 - **Enc. 9–11** — Orquestração com Airflow.
 - **Enc. 12–14** — Serving com FastAPI + CI/CD.
 - **Enc. 15** — Monitoramento com Evidently.
